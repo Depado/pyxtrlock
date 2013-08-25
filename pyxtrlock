@@ -12,6 +12,12 @@ import simplepam as pam
 import pyxtrlock.xcb as xcb
 import pyxtrlock.X as X
 
+from gi.repository import Notify
+from datetime import datetime
+import logging
+logging.basicConfig(filename='attempts.log',level=logging.DEBUG)
+
+
 lock_width = 28
 lock_height = 40
 lock_x_hot = 14
@@ -160,7 +166,7 @@ if not ic:
 X.set_ic_focus(ic)
 
 # timeout algorithm constants
-TIMEOUTPERATTEMPT = 30000
+TIMEOUTPERATTEMPT = 3000
 MAXGOODWILL = TIMEOUTPERATTEMPT * 5
 INITIALGOODWILL = MAXGOODWILL
 GOODWILLPORTION = 0.3
@@ -169,6 +175,7 @@ GOODWILLPORTION = 0.3
 pwd = []
 timeout = 0
 goodwill = INITIALGOODWILL
+attempts = 0
 while True:
     event = xcb.wait_for_event(conn)
     if event.contents.response_type == xcb.KEY_PRESS:
@@ -218,13 +225,19 @@ while True:
                 continue
             elif keysym == X.K_LineFeed or keysym == X.K_Return:
                 if pam.authenticate(getpass.getuser(), b''.join(pwd)):
+                    if attempts > 0:
+                        Notify.init("Hello world")
+                        Hello=Notify.Notification.new("Welcome Back","%i Unlocking Attempts" % attempts,"dialog-information")
+                        Hello.show ()
                     break
                 else:
+                    attempts += 1
+                    logging.warning("Attempt at "+str(datetime.now()))
                     pwd = []
                     if timeout:
                         goodwill += time_stamp - timeout
                         if goodwill > MAXGOODWILL:
-                            goodwill = MAXGODWILL
+                            goodwill = MAXGOODWILL
                     timeout = -int(goodwill * GOODWILLPORTION)
                     goodwill += timeout
                     timeout += time_stamp + TIMEOUTPERATTEMPT
